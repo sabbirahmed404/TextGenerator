@@ -1,19 +1,31 @@
 import { useState, useEffect } from 'react';
 import { Clock, X, Star, Trash2, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { supabase } from '../utils/supabase';
-import { WRITING_TYPES } from '../data/constants';
+import { getWritingTypes } from '../utils/database';
+import * as LucideIcons from 'lucide-react';
 
 export default function HistorySidebar({ isOpen, onClose, onLoadHistory }) {
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [writingTypes, setWritingTypes] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
       loadHistory();
+      loadWritingTypes();
     }
   }, [isOpen]);
+
+  const loadWritingTypes = async () => {
+    try {
+      const types = await getWritingTypes();
+      setWritingTypes(types);
+    } catch (error) {
+      console.error('Error loading writing types:', error);
+    }
+  };
 
   const loadHistory = async () => {
     setIsLoading(true);
@@ -74,12 +86,15 @@ export default function HistorySidebar({ isOpen, onClose, onLoadHistory }) {
   };
 
   const getTypeIcon = (writingType) => {
-    const type = WRITING_TYPES.find(t => t.value === writingType);
-    return type ? type.icon : Clock;
+    const type = writingTypes.find(t => t.value === writingType);
+    if (type && type.icon_name) {
+      return LucideIcons[type.icon_name] || Clock;
+    }
+    return Clock;
   };
 
   const getTypeLabel = (writingType) => {
-    const type = WRITING_TYPES.find(t => t.value === writingType);
+    const type = writingTypes.find(t => t.value === writingType);
     return type ? type.label : writingType;
   };
 
@@ -147,7 +162,7 @@ export default function HistorySidebar({ isOpen, onClose, onLoadHistory }) {
               className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="all">All Types</option>
-              {WRITING_TYPES.map(type => (
+              {writingTypes.map(type => (
                 <option key={type.value} value={type.value}>
                   {type.label}
                 </option>

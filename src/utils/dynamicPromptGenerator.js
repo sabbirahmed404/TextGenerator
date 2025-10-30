@@ -1,4 +1,4 @@
-import { getPromptTemplate, getProfile } from './database';
+import { getPromptTemplate, getProfile, getTones } from './database';
 
 /**
  * Replaces placeholders in a template with actual values
@@ -33,10 +33,15 @@ export const generateDynamicPrompt = async ({
   wordLimit
 }) => {
   try {
-    // Fetch template and profile from database
-    const [template, profile] = await Promise.all([
+    // Determine context for tones (email or linkedin)
+    const isLinkedIn = writingType === 'linkedin_message';
+    const toneContext = isLinkedIn ? 'linkedin' : 'email';
+    
+    // Fetch template, profile, and tones from database
+    const [template, profile, tones] = await Promise.all([
       getPromptTemplate(writingType),
-      getProfile()
+      getProfile(),
+      getTones(toneContext)
     ]);
 
     if (!template) {
@@ -69,7 +74,11 @@ export const generateDynamicPrompt = async ({
       if (hasConversation) {
         const conversationString = conversationContext
           .filter(msg => msg.text.trim())
-          .map(msg => `[${msg.direction === 'sent' ? `${profile.name} sent` : 'They sent'}]: ${msg.text}`)
+          .map(msg => {
+            const sender = msg.direction === 'sent' ? `${profile.name} sent` : 'They sent';
+            const timestamp = msg.timestamp ? ` (${msg.timestamp})` : '';
+            return `[${sender}${timestamp}]: ${msg.text}`;
+          })
           .join('\n');
         
         conversationHistory = `CONVERSATION HISTORY (READ CAREFULLY):
@@ -94,37 +103,9 @@ CRITICAL: This is a REPLY to their last message. You MUST:
       }
     }
 
-    // Prepare tone description
-    let toneDescription = '';
-    switch(tone) {
-      case 'casual_professional':
-        toneDescription = '- Friendly but professional, like talking to a colleague';
-        break;
-      case 'conversational':
-        toneDescription = '- Natural and easy-going, like a real conversation';
-        break;
-      case 'direct':
-        toneDescription = '- Brief and to the point, respectful but efficient';
-        break;
-      case 'warm':
-        toneDescription = '- Genuine and approachable, build connection';
-        break;
-      case 'respectful':
-        toneDescription = '- Polite and courteous, show appreciation';
-        break;
-      case 'professional':
-        toneDescription = '- Clear and business-appropriate';
-        break;
-      case 'concise':
-        toneDescription = '- Brief and to the point';
-        break;
-      case 'enthusiastic':
-        toneDescription = '- Energetic and passionate';
-        break;
-      case 'humble':
-        toneDescription = '- Respectful and grateful';
-        break;
-    }
+    // Get tone description from database
+    const toneObj = tones.find(t => t.value === tone);
+    const toneDescription = toneObj ? `- ${toneObj.description}` : '';
 
     // Prepare profile data
     const topSkills = Array.isArray(profile.key_skills) 

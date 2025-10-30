@@ -23,7 +23,7 @@ export default function InternshipAppGenerator() {
   const [customWordLimit, setCustomWordLimit] = useState('');
   const [isCustomWordLimit, setIsCustomWordLimit] = useState(false);
   const [conversationContext, setConversationContext] = useState([
-    { id: 1, direction: 'received', text: '' }
+    { id: 1, direction: 'received', text: '', timestamp: '' }
   ]);
   const [generatedContent, setGeneratedContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -123,9 +123,13 @@ export default function InternshipAppGenerator() {
   };
 
   const addConversationMessage = () => {
+    // Smart default: alternate direction based on last message
+    const lastMessage = conversationContext[conversationContext.length - 1];
+    const newDirection = lastMessage.direction === 'sent' ? 'received' : 'sent';
+    
     setConversationContext([
       ...conversationContext,
-      { id: Date.now(), direction: 'received', text: '' }
+      { id: Date.now(), direction: newDirection, text: '', timestamp: '' }
     ]);
   };
 
@@ -328,7 +332,7 @@ export default function InternshipAppGenerator() {
     setSpecificDetails('');
     setLinkedinPersonInfo('');
     setWordLimit(150);
-    setConversationContext([{ id: 1, direction: 'received', text: '' }]);
+    setConversationContext([{ id: 1, direction: 'received', text: '', timestamp: '' }]);
     setGeneratedContent('');
     setCurrentHistoryId(null);
   };
@@ -708,25 +712,53 @@ export default function InternshipAppGenerator() {
                     {conversationContext.map((msg, index) => (
                       <div key={msg.id} className="flex gap-3 items-start">
                         <div className="flex-1 space-y-2">
-                          <select
-                            value={msg.direction}
-                            onChange={(e) => updateConversationMessage(msg.id, 'direction', e.target.value)}
-                            className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white/80"
-                          >
-                            <option value="received">They sent ←</option>
-                            <option value="sent">You sent →</option>
-                          </select>
+                          {/* Direction Toggle Buttons */}
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => updateConversationMessage(msg.id, 'direction', 'sent')}
+                              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                                msg.direction === 'sent'
+                                  ? 'bg-blue-500 text-white shadow-md'
+                                  : 'bg-white/80 text-slate-600 border border-slate-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              You Sent →
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateConversationMessage(msg.id, 'direction', 'received')}
+                              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                                msg.direction === 'received'
+                                  ? 'bg-purple-500 text-white shadow-md'
+                                  : 'bg-white/80 text-slate-600 border border-slate-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              ← They Sent
+                            </button>
+                          </div>
+                          
+                          {/* Message Text */}
                           <textarea
                             value={msg.text}
                             onChange={(e) => updateConversationMessage(msg.id, 'text', e.target.value)}
                             placeholder={`Message ${index + 1}...`}
                             className="w-full h-20 p-3 border border-slate-200 rounded-lg resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-white/80 text-slate-700 placeholder-slate-400 text-sm"
                           />
+                          
+                          {/* Optional Timestamp */}
+                          <input
+                            type="text"
+                            value={msg.timestamp || ''}
+                            onChange={(e) => updateConversationMessage(msg.id, 'timestamp', e.target.value)}
+                            placeholder="Timestamp (optional, e.g., '2 days ago' or '10:30 AM')..."
+                            className="w-full p-2 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white/80 text-slate-600 placeholder-slate-400"
+                          />
                         </div>
                         {conversationContext.length > 1 && (
                           <button
                             onClick={() => removeConversationMessage(msg.id)}
-                            className="mt-8 p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            className="mt-1 p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                           >
                             ×
                           </button>

@@ -6,14 +6,14 @@ export const WRITING_TYPES = [
     label: 'Cold Email to HR',
     description: 'Direct outreach to hiring manager',
     icon: Mail,
-    lengthOptions: [100, 130, 150, 180, 200, 250]
+    lengthOptions: [50,75, 100, 130, 150, 180, 200, 250]
   },
   { 
     value: 'cover_letter', 
     label: 'Cover Letter',
     description: 'Formal application document',
     icon: FileText,
-    lengthOptions: [250, 300, 350, 400, 450, 500]
+    lengthOptions: [100, 150, 200, 250, 300, 350, 400, 450, 500]
   },
   { 
     value: 'linkedin_message', 
@@ -27,7 +27,7 @@ export const WRITING_TYPES = [
     label: 'Follow-up Email',
     description: 'After application or interview',
     icon: Send,
-    lengthOptions: [100, 120, 150, 180, 200, 250]
+    lengthOptions: [10,20,40,50, 75,100, 120, 150, 180, 200, 250]
   }
 ];
 

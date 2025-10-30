@@ -1,8 +1,13 @@
-import { useState } from 'react';
-import { Send, Copy, Check, Mail, Briefcase, Building2, FileText, Sparkles, MessageSquare } from 'lucide-react';
-import { PROFILE } from '../data/profile';
-import { WRITING_TYPES, ROLE_LEVELS, TONES } from '../data/constants';
-import { generateSystemPrompt } from '../utils/promptGenerator';
+import { useState, useEffect } from 'react';
+import { Send, Copy, Check, Mail, Briefcase, Building2, FileText, Sparkles, MessageSquare, Clock, Save, Edit, User, Settings } from 'lucide-react';
+import { supabase } from '../utils/supabase';
+import { getProfile, getWritingTypes, getTones, getRoleLevels, updateProfile, updatePromptTemplate, updateWritingType, addWritingType, deleteWritingType, updateTone, addTone, deleteTone, updateRoleLevel, addRoleLevel, deleteRoleLevel, getAllPromptTemplates } from '../utils/database';
+import { generateDynamicPrompt } from '../utils/dynamicPromptGenerator';
+import HistorySidebar from './HistorySidebar';
+import EditProfileModal from './EditProfileModal';
+import EditPromptsModal from './EditPromptsModal';
+import EditConfigModal from './EditConfigModal';
+import * as LucideIcons from 'lucide-react';
 
 export default function InternshipAppGenerator() {
   const [writingType, setWritingType] = useState('cold_email');
@@ -23,23 +28,79 @@ export default function InternshipAppGenerator() {
   const [generatedContent, setGeneratedContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [currentHistoryId, setCurrentHistoryId] = useState(null);
+  
+  // Database data
+  const [profile, setProfile] = useState(null);
+  const [writingTypes, setWritingTypes] = useState([]);
+  const [emailTones, setEmailTones] = useState([]);
+  const [linkedinTones, setLinkedinTones] = useState([]);
+  const [roleLevels, setRoleLevels] = useState([]);
+  const [promptTemplates, setPromptTemplates] = useState([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  
+  // Modals
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isPromptsModalOpen, setIsPromptsModalOpen] = useState(false);
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [configType, setConfigType] = useState(null);
+
+  // Load data from database on mount
+  useEffect(() => {
+    loadDatabaseData();
+  }, []);
+
+  const loadDatabaseData = async () => {
+    setIsLoadingData(true);
+    try {
+      const [profileData, typesData, emailTonesData, linkedinTonesData, levelsData, templatesData] = await Promise.all([
+        getProfile(),
+        getWritingTypes(),
+        getTones('email'),
+        getTones('linkedin'),
+        getRoleLevels(),
+        getAllPromptTemplates()
+      ]);
+      
+      setProfile(profileData);
+      setWritingTypes(typesData);
+      setEmailTones(emailTonesData);
+      setLinkedinTones(linkedinTonesData);
+      setRoleLevels(levelsData);
+      setPromptTemplates(templatesData);
+    } catch (error) {
+      console.error('Error loading database data:', error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  // Reset history ID when user makes changes (to create new entries)
+  const resetHistoryId = () => {
+    if (currentHistoryId) {
+      setCurrentHistoryId(null);
+    }
+  };
 
   // Update word limit and tone when writing type changes
   const handleWritingTypeChange = (type) => {
     setWritingType(type);
-    const selectedType = WRITING_TYPES.find(t => t.value === type);
-    if (selectedType) {
-      const midIndex = Math.floor(selectedType.lengthOptions.length / 2);
-      setWordLimit(selectedType.lengthOptions[midIndex]);
+    resetHistoryId();
+    const selectedType = writingTypes.find(t => t.value === type);
+    if (selectedType && selectedType.length_options) {
+      const midIndex = Math.floor(selectedType.length_options.length / 2);
+      setWordLimit(selectedType.length_options[midIndex]);
     }
     // Reset custom word limit
     setIsCustomWordLimit(false);
     setCustomWordLimit('');
     // Reset tone to first option for the type
     if (type === 'linkedin_message') {
-      setTone('casual_professional');
+      setTone(linkedinTones[0]?.value || 'casual_professional');
     } else {
-      setTone('professional');
+      setTone(emailTones[0]?.value || 'professional');
     }
   };
 
@@ -87,8 +148,8 @@ export default function InternshipAppGenerator() {
         return;
       }
     } else {
-      if (!companyName.trim() || !roleName.trim()) {
-        alert('Please provide at least the company name and role!');
+      if (!companyName.trim()) {
+        alert('Please provide at least the company name!');
         return;
       }
     }
@@ -96,6 +157,7 @@ export default function InternshipAppGenerator() {
     setIsLoading(true);
     try {
       const params = {
+        writingType,
         roleLevel,
         companyName,
         roleName,
@@ -108,7 +170,7 @@ export default function InternshipAppGenerator() {
         wordLimit
       };
 
-      const systemPrompt = generateSystemPrompt(writingType, params);
+      const systemPrompt = await generateDynamicPrompt(params);
       
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
@@ -117,7 +179,7 @@ export default function InternshipAppGenerator() {
       }
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
@@ -146,6 +208,12 @@ export default function InternshipAppGenerator() {
       const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
       
       setGeneratedContent(content.trim());
+      
+      // Reset history ID before saving to create new entry
+      setCurrentHistoryId(null);
+      
+      // Auto-save to history
+      await saveToHistory(content.trim());
     } catch (error) {
       console.error('Error generating content:', error);
       setGeneratedContent('Sorry, there was an error. Please try again.');
@@ -170,13 +238,220 @@ export default function InternshipAppGenerator() {
     }
   };
 
-  const selectedType = WRITING_TYPES.find(t => t.value === writingType);
-  const TypeIcon = selectedType?.icon || Mail;
+  const saveToHistory = async (content = generatedContent) => {
+    if (!content || !content.trim()) return;
+
+    setIsSaving(true);
+    try {
+      // Generate a title based on the writing type and company/person
+      let title = '';
+      if (writingType === 'linkedin_message') {
+        const personName = linkedinPersonInfo.split('\n')[0].substring(0, 50);
+        title = `LinkedIn: ${personName}`;
+      } else {
+        title = `${WRITING_TYPES.find(t => t.value === writingType)?.label}: ${companyName || 'Untitled'}`;
+      }
+
+      const historyData = {
+        writing_type: writingType,
+        tone,
+        role_level: roleLevel,
+        word_limit: wordLimit,
+        company_name: companyName || null,
+        role_name: roleName || null,
+        job_description: jobDescription || null,
+        company_info: companyInfo || null,
+        specific_details: specificDetails || null,
+        linkedin_person_info: linkedinPersonInfo || null,
+        conversation_context: writingType === 'linkedin_message' ? conversationContext : null,
+        generated_content: content,
+        title,
+        is_favorite: false
+      };
+
+      if (currentHistoryId) {
+        // Update existing history
+        const { error } = await supabase
+          .from('generation_history')
+          .update({ ...historyData, updated_at: new Date().toISOString() })
+          .eq('id', currentHistoryId);
+
+        if (error) throw error;
+      } else {
+        // Create new history
+        const { data, error } = await supabase
+          .from('generation_history')
+          .insert([historyData])
+          .select();
+
+        if (error) throw error;
+        if (data && data[0]) {
+          setCurrentHistoryId(data[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving to history:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadFromHistory = (historyItem) => {
+    setWritingType(historyItem.writing_type);
+    setTone(historyItem.tone);
+    setRoleLevel(historyItem.role_level);
+    setWordLimit(historyItem.word_limit);
+    setCompanyName(historyItem.company_name || '');
+    setRoleName(historyItem.role_name || '');
+    setJobDescription(historyItem.job_description || '');
+    setCompanyInfo(historyItem.company_info || '');
+    setSpecificDetails(historyItem.specific_details || '');
+    setLinkedinPersonInfo(historyItem.linkedin_person_info || '');
+    
+    if (historyItem.conversation_context) {
+      setConversationContext(historyItem.conversation_context);
+    }
+    
+    setGeneratedContent(historyItem.generated_content || '');
+    setCurrentHistoryId(historyItem.id);
+    setIsSidebarOpen(false);
+  };
+
+  const createNew = () => {
+    setWritingType('cold_email');
+    setTone('professional');
+    setRoleLevel('intern');
+    setCompanyName('');
+    setRoleName('');
+    setJobDescription('');
+    setCompanyInfo('');
+    setSpecificDetails('');
+    setLinkedinPersonInfo('');
+    setWordLimit(150);
+    setConversationContext([{ id: 1, direction: 'received', text: '' }]);
+    setGeneratedContent('');
+    setCurrentHistoryId(null);
+  };
+
+  const selectedType = writingTypes.find(t => t.value === writingType);
+  const TypeIcon = selectedType?.icon_name ? LucideIcons[selectedType.icon_name] || Mail : Mail;
   const isLinkedIn = writingType === 'linkedin_message';
-  const availableTones = isLinkedIn ? TONES.linkedin : TONES.email;
+  const availableTones = isLinkedIn ? linkedinTones : emailTones;
+  
+  // Handle config modal
+  const openConfigModal = (type) => {
+    setConfigType(type);
+    setIsConfigModalOpen(true);
+  };
+  
+  const getConfigData = () => {
+    switch(configType) {
+      case 'writing_types': return writingTypes;
+      case 'tones': return [...emailTones, ...linkedinTones];
+      case 'role_levels': return roleLevels;
+      default: return [];
+    }
+  };
+  
+  const handleConfigSave = async (id, data) => {
+    switch(configType) {
+      case 'writing_types':
+        await updateWritingType(id, data);
+        break;
+      case 'tones':
+        await updateTone(id, data);
+        break;
+      case 'role_levels':
+        await updateRoleLevel(id, data);
+        break;
+    }
+    await loadDatabaseData();
+  };
+  
+  const handleConfigAdd = async (data) => {
+    switch(configType) {
+      case 'writing_types':
+        await addWritingType(data);
+        break;
+      case 'tones':
+        await addTone(data);
+        break;
+      case 'role_levels':
+        await addRoleLevel(data);
+        break;
+    }
+    await loadDatabaseData();
+  };
+  
+  const handleConfigDelete = async (id) => {
+    switch(configType) {
+      case 'writing_types':
+        await deleteWritingType(id);
+        break;
+      case 'tones':
+        await deleteTone(id);
+        break;
+      case 'role_levels':
+        await deleteRoleLevel(id);
+        break;
+    }
+    await loadDatabaseData();
+  };
+  
+  const handleProfileSave = async (profileData) => {
+    await updateProfile(profileData);
+    await loadDatabaseData();
+  };
+  
+  const handlePromptSave = async (id, data) => {
+    await updatePromptTemplate(id, data);
+    await loadDatabaseData();
+  };
+  
+  if (isLoadingData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600 text-lg">Loading configuration...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50">
+      {/* Modals */}
+      <EditProfileModal 
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        profile={profile}
+        onSave={handleProfileSave}
+      />
+      
+      <EditPromptsModal 
+        isOpen={isPromptsModalOpen}
+        onClose={() => setIsPromptsModalOpen(false)}
+        templates={promptTemplates}
+        onSave={handlePromptSave}
+      />
+      
+      <EditConfigModal 
+        isOpen={isConfigModalOpen}
+        onClose={() => setIsConfigModalOpen(false)}
+        configType={configType}
+        data={getConfigData()}
+        onSave={handleConfigSave}
+        onAdd={handleConfigAdd}
+        onDelete={handleConfigDelete}
+      />
+      
+      {/* History Sidebar */}
+      <HistorySidebar 
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        onLoadHistory={loadFromHistory}
+      />
       {/* Header */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/5 to-blue-600/5"></div>
@@ -185,9 +460,41 @@ export default function InternshipAppGenerator() {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl mb-6 shadow-lg">
               <Briefcase className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent mb-4">
-              Sabbir's Application Generator
-            </h1>
+            <div className="flex items-center justify-center gap-4 mb-4">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+                {profile?.name}'s Application Generator
+              </h1>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsProfileModalOpen(true)}
+                  className="p-3 bg-white/70 backdrop-blur-sm hover:bg-white rounded-xl transition-all shadow-lg border border-white/20 group"
+                  title="Edit Profile"
+                >
+                  <User className="w-6 h-6 text-purple-600 group-hover:scale-110 transition-transform" />
+                </button>
+                <button
+                  onClick={() => setIsPromptsModalOpen(true)}
+                  className="p-3 bg-white/70 backdrop-blur-sm hover:bg-white rounded-xl transition-all shadow-lg border border-white/20 group"
+                  title="Edit Prompts"
+                >
+                  <Edit className="w-6 h-6 text-green-600 group-hover:scale-110 transition-transform" />
+                </button>
+                <button
+                  onClick={() => openConfigModal('writing_types')}
+                  className="p-3 bg-white/70 backdrop-blur-sm hover:bg-white rounded-xl transition-all shadow-lg border border-white/20 group"
+                  title="Edit Configuration"
+                >
+                  <Settings className="w-6 h-6 text-orange-600 group-hover:scale-110 transition-transform" />
+                </button>
+                <button
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="p-3 bg-white/70 backdrop-blur-sm hover:bg-white rounded-xl transition-all shadow-lg border border-white/20 group"
+                  title="View History"
+                >
+                  <Clock className="w-6 h-6 text-indigo-600 group-hover:scale-110 transition-transform" />
+                </button>
+              </div>
+            </div>
             <p className="text-xl text-slate-600 max-w-2xl mx-auto mb-4">
               Professional applications that respect word limits and conversation context
             </p>
@@ -204,16 +511,25 @@ export default function InternshipAppGenerator() {
             
             {/* Writing Type Selection */}
             <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-white/20">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-                  <TypeIcon className="w-5 h-5 text-indigo-600" />
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                    <TypeIcon className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <h2 className="text-2xl font-semibold text-slate-800">Writing Type</h2>
                 </div>
-                <h2 className="text-2xl font-semibold text-slate-800">Writing Type</h2>
+                <button
+                  onClick={() => openConfigModal('writing_types')}
+                  className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                  title="Edit Writing Types"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
               </div>
               
               <div className="grid grid-cols-2 gap-3">
-                {WRITING_TYPES.map((type) => {
-                  const Icon = type.icon;
+                {writingTypes.map((type) => {
+                  const Icon = type.icon_name ? LucideIcons[type.icon_name] || Mail : Mail;
                   return (
                     <button
                       key={type.value}
@@ -237,18 +553,30 @@ export default function InternshipAppGenerator() {
 
             {/* Tone Selection */}
             <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-white/20">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-blue-600" />
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <h2 className="text-2xl font-semibold text-slate-800">Tone {isLinkedIn && '(LinkedIn)'}</h2>
                 </div>
-                <h2 className="text-2xl font-semibold text-slate-800">Tone {isLinkedIn && '(LinkedIn)'}</h2>
+                <button
+                  onClick={() => openConfigModal('tones')}
+                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="Edit Tones"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
               </div>
               
               <div className="grid grid-cols-2 gap-3">
                 {availableTones.map((toneOption) => (
                   <button
                     key={toneOption.value}
-                    onClick={() => setTone(toneOption.value)}
+                    onClick={() => {
+                      setTone(toneOption.value);
+                      resetHistoryId();
+                    }}
                     className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
                       tone === toneOption.value
                         ? 'border-blue-500 bg-blue-50 shadow-md'
@@ -281,7 +609,10 @@ export default function InternshipAppGenerator() {
                       </label>
                       <textarea
                         value={linkedinPersonInfo}
-                        onChange={(e) => setLinkedinPersonInfo(e.target.value)}
+                        onChange={(e) => {
+                          setLinkedinPersonInfo(e.target.value);
+                          resetHistoryId();
+                        }}
                         onKeyDown={handleKeyPress}
                         placeholder="Paste their LinkedIn profile info, company details, or what you know about them..."
                         className="w-full h-32 p-3 border border-slate-200 rounded-xl resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white/80 text-slate-700 placeholder-slate-400"
@@ -298,7 +629,7 @@ export default function InternshipAppGenerator() {
                           onChange={(e) => setRoleLevel(e.target.value)}
                           className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white/80 text-slate-700"
                         >
-                          {ROLE_LEVELS.map(level => (
+                          {roleLevels.map(level => (
                             <option key={level.value} value={level.value}>
                               {level.label}
                             </option>
@@ -315,7 +646,7 @@ export default function InternshipAppGenerator() {
                           onChange={(e) => handleWordLimitChange(e.target.value)}
                           className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white/80 text-slate-700"
                         >
-                          {selectedType?.lengthOptions.map(length => (
+                          {selectedType?.length_options?.map(length => (
                             <option key={length} value={length}>
                               {length} words
                             </option>
@@ -423,7 +754,10 @@ export default function InternshipAppGenerator() {
                     <input
                       type="text"
                       value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
+                      onChange={(e) => {
+                        setCompanyName(e.target.value);
+                        resetHistoryId();
+                      }}
                       placeholder="e.g., Cefalo, Brain Station 23"
                       className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white/80 text-slate-700"
                     />
@@ -439,7 +773,7 @@ export default function InternshipAppGenerator() {
                         onChange={(e) => setRoleLevel(e.target.value)}
                         className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white/80 text-slate-700"
                       >
-                        {ROLE_LEVELS.map(level => (
+                        {roleLevels.map(level => (
                           <option key={level.value} value={level.value}>
                             {level.label}
                           </option>
@@ -456,7 +790,7 @@ export default function InternshipAppGenerator() {
                         onChange={(e) => handleWordLimitChange(e.target.value)}
                         className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white/80 text-slate-700"
                       >
-                        {selectedType?.lengthOptions.map(length => (
+                        {selectedType?.length_options?.map(length => (
                           <option key={length} value={length}>
                             {length} words
                           </option>
@@ -479,7 +813,7 @@ export default function InternshipAppGenerator() {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Role/Position Title *
+                      Role/Position Title
                     </label>
                     <input
                       type="text"
@@ -535,7 +869,7 @@ export default function InternshipAppGenerator() {
             {/* Generate Button */}
             <button
               onClick={generateContent}
-              disabled={isLoading || (isLinkedIn ? !linkedinPersonInfo.trim() : (!companyName.trim() || !roleName.trim()))}
+              disabled={isLoading || (isLinkedIn ? !linkedinPersonInfo.trim() : !companyName.trim())}
               className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-4 px-8 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3"
             >
               {isLoading ? (
@@ -563,24 +897,41 @@ export default function InternshipAppGenerator() {
                   <h2 className="text-2xl font-semibold text-slate-800">Generated Content</h2>
                 </div>
                 
-                {generatedContent && (
-                  <button
-                    onClick={copyToClipboard}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-slate-700 font-medium"
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="w-4 h-4 text-green-600" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4" />
-                        Copy
-                      </>
-                    )}
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {generatedContent && (
+                    <>
+                      <button
+                        onClick={saveToHistory}
+                        disabled={isSaving}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-100 hover:bg-indigo-200 rounded-lg transition-colors text-indigo-700 font-medium disabled:opacity-50"
+                        title="Save to History"
+                      >
+                        {isSaving ? (
+                          <div className="w-4 h-4 border-2 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin"></div>
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                        {currentHistoryId ? 'Update' : 'Save'}
+                      </button>
+                      <button
+                        onClick={copyToClipboard}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-slate-700 font-medium"
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="w-4 h-4 text-green-600" />
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4" />
+                            Copy
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
               
               {generatedContent ? (

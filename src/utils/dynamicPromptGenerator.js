@@ -35,6 +35,8 @@ export const generateDynamicPrompt = async ({
   try {
     // Determine context for tones (email or linkedin)
     const isLinkedIn = writingType === 'linkedin_message';
+    const isFollowUp = writingType === 'follow_up';
+    const hasConversationContext = isLinkedIn || isFollowUp;
     const toneContext = isLinkedIn ? 'linkedin' : 'email';
     
     // Fetch template, profile, and tones from database
@@ -62,7 +64,7 @@ export const generateDynamicPrompt = async ({
       rolePresentation = `Present as: "I'm ${profile.name}, a Software Engineer specializing in AI/ML and full-stack development."`;
     }
 
-    // Prepare conversation context for LinkedIn
+    // Prepare conversation context for LinkedIn & Follow-up emails
     const hasConversation = conversationContext?.some(msg => msg.text.trim());
     let conversationHistory = '';
     let conversationRule1 = '';
@@ -70,7 +72,7 @@ export const generateDynamicPrompt = async ({
     let conversationRule3 = '';
     let criticalRule = '';
     
-    if (writingType === 'linkedin_message') {
+    if (hasConversationContext) {
       if (hasConversation) {
         const conversationString = conversationContext
           .filter(msg => msg.text.trim())
@@ -84,7 +86,7 @@ export const generateDynamicPrompt = async ({
         conversationHistory = `CONVERSATION HISTORY (READ CAREFULLY):
 ${conversationString}
 
-CRITICAL: This is a REPLY to their last message. You MUST:
+CRITICAL: This is a ${isFollowUp ? 'FOLLOW-UP' : 'REPLY'} to their last message. You MUST:
 1. Directly reference/respond to what they just said
 2. Keep the conversational flow natural
 3. Don't introduce yourself again if you already did
@@ -95,11 +97,11 @@ CRITICAL: This is a REPLY to their last message. You MUST:
         conversationRule3 = 'Next step or question based on conversation';
         criticalRule = 'MUST respond to their last message first';
       } else {
-        conversationHistory = 'This is an INITIAL message.';
-        conversationRule1 = 'Start with casual greeting: "Hi [Name]," or "Hey [Name],"';
-        conversationRule2 = 'Brief intro (1 line max)';
-        conversationRule3 = 'Simple ask or question';
-        criticalRule = 'Start with casual greeting';
+        conversationHistory = isFollowUp ? 'This is an INITIAL follow-up email.' : 'This is an INITIAL message.';
+        conversationRule1 = isLinkedIn ? 'Start with casual greeting: "Hi [Name]," or "Hey [Name],"' : 'Start with professional greeting: "Dear [Name]," or "Respected [Name],"';
+        conversationRule2 = isFollowUp ? 'Reference previous interaction (application/interview)' : 'Brief intro (1 line max)';
+        conversationRule3 = isFollowUp ? 'Express continued interest and request update' : 'Simple ask or question';
+        criticalRule = isLinkedIn ? 'Start with casual greeting' : 'Start with professional greeting';
       }
     }
 

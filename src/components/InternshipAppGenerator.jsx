@@ -151,6 +151,11 @@ export default function InternshipAppGenerator() {
         alert('Please provide information about the person/company you\'re messaging!');
         return;
       }
+    } else if (writingType === 'follow_up') {
+      if (!linkedinPersonInfo.trim()) {
+        alert('Please provide information about who you\'re following up with!');
+        return;
+      }
     } else {
       if (!companyName.trim()) {
         alert('Please provide at least the company name!');
@@ -267,7 +272,7 @@ export default function InternshipAppGenerator() {
         company_info: companyInfo || null,
         specific_details: specificDetails || null,
         linkedin_person_info: linkedinPersonInfo || null,
-        conversation_context: writingType === 'linkedin_message' ? conversationContext : null,
+        conversation_context: hasConversationContext ? conversationContext : null,
         generated_content: content,
         title,
         is_favorite: false
@@ -340,6 +345,8 @@ export default function InternshipAppGenerator() {
   const selectedType = writingTypes.find(t => t.value === writingType);
   const TypeIcon = selectedType?.icon_name ? LucideIcons[selectedType.icon_name] || Mail : Mail;
   const isLinkedIn = writingType === 'linkedin_message';
+  const isFollowUp = writingType === 'follow_up';
+  const hasConversationContext = isLinkedIn || isFollowUp;
   const availableTones = isLinkedIn ? linkedinTones : emailTones;
   
   // Handle config modal
@@ -595,21 +602,21 @@ export default function InternshipAppGenerator() {
             </div>
 
             {/* Conditional Fields */}
-            {isLinkedIn ? (
-              // LinkedIn-specific fields
+            {hasConversationContext ? (
+              // LinkedIn & Follow-up fields with conversation context
               <>
                 <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-white/20">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 bg-cyan-100 rounded-xl flex items-center justify-center">
                       <Building2 className="w-5 h-5 text-cyan-600" />
                     </div>
-                    <h2 className="text-2xl font-semibold text-slate-800">Person/Company Info</h2>
+                    <h2 className="text-2xl font-semibold text-slate-800">{isFollowUp ? 'Follow-up Details' : 'Person/Company Info'}</h2>
                   </div>
                   
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Who are you messaging? *
+                        {isFollowUp ? 'Who are you following up with? *' : 'Who are you messaging? *'}
                       </label>
                       <textarea
                         value={linkedinPersonInfo}
@@ -618,7 +625,7 @@ export default function InternshipAppGenerator() {
                           resetHistoryId();
                         }}
                         onKeyDown={handleKeyPress}
-                        placeholder="Paste their LinkedIn profile info, company details, or what you know about them..."
+                        placeholder={isFollowUp ? "Person's name, company, role you applied for..." : "Paste their LinkedIn profile info, company details, or what you know about them..."}
                         className="w-full h-32 p-3 border border-slate-200 rounded-xl resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white/80 text-slate-700 placeholder-slate-400"
                       />
                     </div>
@@ -686,7 +693,7 @@ export default function InternshipAppGenerator() {
                   </div>
                 </div>
 
-                {/* LinkedIn Conversation Context */}
+                {/* Conversation Context for LinkedIn & Follow-up */}
                 <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-white/20">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
@@ -705,7 +712,7 @@ export default function InternshipAppGenerator() {
                   </div>
 
                   <p className="text-sm text-slate-600 mb-4">
-                    If replying to existing messages, add them here for contextual response
+                    {isFollowUp ? 'Add previous email exchanges or interview conversations for context' : 'If replying to existing messages, add them here for contextual response'}
                   </p>
 
                   <div className="space-y-3">
@@ -924,7 +931,7 @@ export default function InternshipAppGenerator() {
             {/* Generate Button */}
             <button
               onClick={generateContent}
-              disabled={isLoading || (isLinkedIn ? !linkedinPersonInfo.trim() : !companyName.trim())}
+              disabled={isLoading || (hasConversationContext ? !linkedinPersonInfo.trim() : !companyName.trim())}
               className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-4 px-8 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3"
             >
               {isLoading ? (

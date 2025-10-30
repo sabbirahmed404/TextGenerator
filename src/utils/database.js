@@ -327,3 +327,17 @@ export const addPromptTemplate = async (templateData) => {
     throw error;
   }
 };
+
+export const deletePromptTemplate = async (id) => {
+  try {
+    const { error } = await supabase
+      .from('prompt_templates')
+      .update({ is_active: false })
+      .eq('id', id);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting prompt template:', error);
+    throw error;
+  }
+};

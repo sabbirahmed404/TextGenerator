@@ -1,17 +1,25 @@
 import { useState, useEffect } from 'react';
-import { X, Save, FileText } from 'lucide-react';
+import { X, Save, FileText, Plus } from 'lucide-react';
 
-export default function EditPromptsModal({ isOpen, onClose, templates, onSave }) {
+export default function EditPromptsModal({ isOpen, onClose, templates, onSave, onAdd, writingTypes }) {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [templateContent, setTemplateContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newTemplate, setNewTemplate] = useState({
+    writing_type: '',
+    name: '',
+    template_content: '',
+    version: 1,
+    notes: ''
+  });
 
   useEffect(() => {
-    if (templates && templates.length > 0 && !selectedTemplate) {
+    if (templates && templates.length > 0 && !selectedTemplate && !isCreating) {
       setSelectedTemplate(templates[0]);
       setTemplateContent(templates[0].template_content);
     }
-  }, [templates, selectedTemplate]);
+  }, [templates, selectedTemplate, isCreating]);
 
   const handleTemplateSelect = (template) => {
     setSelectedTemplate(template);
@@ -24,13 +32,55 @@ export default function EditPromptsModal({ isOpen, onClose, templates, onSave })
     setIsSaving(true);
     try {
       await onSave(selectedTemplate.id, { template_content: templateContent });
-      onClose();
+      alert('Template saved successfully!');
     } catch (error) {
       console.error('Error saving template:', error);
       alert('Failed to save template. Please try again.');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleCreate = async () => {
+    if (!newTemplate.writing_type || !newTemplate.name || !newTemplate.template_content) {
+      alert('Please fill in all required fields');
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      await onAdd(newTemplate);
+      setIsCreating(false);
+      setNewTemplate({
+        writing_type: '',
+        name: '',
+        template_content: '',
+        version: 1,
+        notes: ''
+      });
+      alert('Template created successfully!');
+    } catch (error) {
+      console.error('Error creating template:', error);
+      alert('Failed to create template. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const startCreating = () => {
+    setIsCreating(true);
+    setSelectedTemplate(null);
+  };
+
+  const cancelCreating = () => {
+    setIsCreating(false);
+    setNewTemplate({
+      writing_type: '',
+      name: '',
+      template_content: '',
+      version: 1,
+      notes: ''
+    });
   };
 
   if (!isOpen) return null;
@@ -58,21 +108,35 @@ export default function EditPromptsModal({ isOpen, onClose, templates, onSave })
         <div className="flex-1 overflow-hidden flex flex-col sm:flex-row">
           {/* Sidebar - Template List */}
           <div className="w-full sm:w-64 border-b sm:border-b-0 sm:border-r border-slate-200 overflow-y-auto bg-slate-50 p-4 max-h-48 sm:max-h-none">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wide">Templates</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Templates</h3>
+              {onAdd && (
+                <button
+                  onClick={startCreating}
+                  className="p-1 hover:bg-purple-100 rounded transition-colors"
+                  title="Add New Template"
+                >
+                  <Plus className="w-4 h-4 text-purple-600" />
+                </button>
+              )}
+            </div>
             <div className="space-y-2">
               {templates?.map((template) => (
                 <button
                   key={template.id}
-                  onClick={() => handleTemplateSelect(template)}
+                  onClick={() => {
+                    setIsCreating(false);
+                    handleTemplateSelect(template);
+                  }}
                   className={`w-full text-left p-3 rounded-lg transition-all ${
-                    selectedTemplate?.id === template.id
+                    selectedTemplate?.id === template.id && !isCreating
                       ? 'bg-indigo-600 text-white shadow-md'
                       : 'bg-white hover:bg-slate-100 text-slate-700'
                   }`}
                 >
                   <div className="font-medium text-sm">{template.name}</div>
                   <div className={`text-xs mt-1 ${
-                    selectedTemplate?.id === template.id ? 'text-indigo-100' : 'text-slate-500'
+                    selectedTemplate?.id === template.id && !isCreating ? 'text-indigo-100' : 'text-slate-500'
                   }`}>
                     {template.writing_type.replace('_', ' ')}
                   </div>
@@ -83,7 +147,84 @@ export default function EditPromptsModal({ isOpen, onClose, templates, onSave })
 
           {/* Main Editor */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {selectedTemplate && (
+            {isCreating ? (
+              // Create New Template Form
+              <>
+                <div className="p-6 border-b border-slate-200 bg-white">
+                  <h3 className="text-lg font-semibold text-slate-800">Create New Prompt Template</h3>
+                  <p className="text-sm text-slate-600 mt-1">Define a new template for a writing type</p>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Writing Type <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={newTemplate.writing_type}
+                        onChange={(e) => setNewTemplate({...newTemplate, writing_type: e.target.value})}
+                        className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="">Select writing type...</option>
+                        {writingTypes?.map((type) => (
+                          <option key={type.value} value={type.value}>
+                            {type.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Template Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newTemplate.name}
+                        onChange={(e) => setNewTemplate({...newTemplate, name: e.target.value})}
+                        placeholder="e.g., Cold Email Template"
+                        className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Notes (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={newTemplate.notes}
+                      onChange={(e) => setNewTemplate({...newTemplate, notes: e.target.value})}
+                      placeholder="Any notes about this template..."
+                      className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Template Content <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={newTemplate.template_content}
+                      onChange={(e) => setNewTemplate({...newTemplate, template_content: e.target.value})}
+                      className="w-full h-80 p-4 font-mono text-sm text-slate-700 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 resize-none"
+                      placeholder="Enter your prompt template here..."
+                    />
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="text-sm font-semibold text-blue-900 mb-2">Available Placeholders:</h4>
+                    <div className="text-xs text-blue-800 space-y-1">
+                      <p><code className="bg-blue-100 px-1 rounded">{'{profile.name}'}</code>, <code className="bg-blue-100 px-1 rounded">{'{profile.email}'}</code>, <code className="bg-blue-100 px-1 rounded">{'{profile.current_position}'}</code></p>
+                      <p><code className="bg-blue-100 px-1 rounded">{'{companyName}'}</code>, <code className="bg-blue-100 px-1 rounded">{'{roleName}'}</code>, <code className="bg-blue-100 px-1 rounded">{'{roleLevel}'}</code></p>
+                      <p><code className="bg-blue-100 px-1 rounded">{'{tone}'}</code>, <code className="bg-blue-100 px-1 rounded">{'{wordLimit}'}</code>, <code className="bg-blue-100 px-1 rounded">{'{specificDetails}'}</code></p>
+                      <p><code className="bg-blue-100 px-1 rounded">{'{linkedinPersonInfo}'}</code>, <code className="bg-blue-100 px-1 rounded">{'{jobDescription}'}</code>, <code className="bg-blue-100 px-1 rounded">{'{companyInfo}'}</code></p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : selectedTemplate && (
               <>
                 <div className="p-6 border-b border-slate-200 bg-white">
                   <h3 className="text-lg font-semibold text-slate-800">{selectedTemplate.name}</h3>
@@ -129,25 +270,25 @@ export default function EditPromptsModal({ isOpen, onClose, templates, onSave })
         {/* Footer */}
         <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 p-4 sm:p-6 border-t border-slate-200 bg-white">
           <button
-            onClick={onClose}
+            onClick={isCreating ? cancelCreating : onClose}
             className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors font-medium text-slate-700"
           >
-            Cancel
+            {isCreating ? 'Cancel' : 'Close'}
           </button>
           <button
-            onClick={handleSave}
-            disabled={isSaving || !templateContent.trim()}
+            onClick={isCreating ? handleCreate : handleSave}
+            disabled={isSaving || (isCreating ? (!newTemplate.writing_type || !newTemplate.name || !newTemplate.template_content) : !templateContent.trim())}
             className="flex items-center justify-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                Saving...
+                {isCreating ? 'Creating...' : 'Saving...'}
               </>
             ) : (
               <>
                 <Save className="w-4 h-4" />
-                Save Template
+                {isCreating ? 'Create Template' : 'Save Template'}
               </>
             )}
           </button>

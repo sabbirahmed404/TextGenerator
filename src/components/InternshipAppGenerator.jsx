@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Send, Copy, Check, Mail, Briefcase, Building2, FileText, Sparkles, MessageSquare, Clock, Save, Edit, User, Settings } from 'lucide-react';
 import { supabase } from '../utils/supabase';
-import { getProfile, getWritingTypes, getTones, getRoleLevels, updateProfile, updatePromptTemplate, updateWritingType, addWritingType, deleteWritingType, updateTone, addTone, deleteTone, updateRoleLevel, addRoleLevel, deleteRoleLevel, getAllPromptTemplates } from '../utils/database';
+import { getProfile, getWritingTypes, getTones, getRoleLevels, updateProfile, updatePromptTemplate, addPromptTemplate, updateWritingType, addWritingType, deleteWritingType, updateTone, addTone, deleteTone, updateRoleLevel, addRoleLevel, deleteRoleLevel, getAllPromptTemplates } from '../utils/database';
 import { generateDynamicPrompt } from '../utils/dynamicPromptGenerator';
 import HistorySidebar from './HistorySidebar';
 import EditProfileModal from './EditProfileModal';
 import EditPromptsModal from './EditPromptsModal';
 import EditConfigModal from './EditConfigModal';
+import EditWritingTypeModal from './EditWritingTypeModal';
 import * as LucideIcons from 'lucide-react';
 
 export default function InternshipAppGenerator() {
@@ -45,6 +46,7 @@ export default function InternshipAppGenerator() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isPromptsModalOpen, setIsPromptsModalOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  const [isWritingTypeModalOpen, setIsWritingTypeModalOpen] = useState(false);
   const [configType, setConfigType] = useState(null);
 
   // Load data from database on mount
@@ -343,7 +345,24 @@ export default function InternshipAppGenerator() {
   };
 
   const selectedType = writingTypes.find(t => t.value === writingType);
-  const TypeIcon = selectedType?.icon_name ? LucideIcons[selectedType.icon_name] || Mail : Mail;
+  
+  // Render icon or emoji
+  const renderTypeIcon = (iconName, className = "w-5 h-5") => {
+    if (!iconName) return <Mail className={className} />;
+    if (iconName.startsWith('emoji:')) {
+      const emoji = iconName.substring(6);
+      return <span className="text-2xl">{emoji}</span>;
+    }
+    const Icon = LucideIcons[iconName] || Mail;
+    return <Icon className={className} />;
+  };
+  
+  const TypeIcon = selectedType?.icon_name ? 
+    (selectedType.icon_name.startsWith('emoji:') ? 
+      (() => <span className="text-2xl">{selectedType.icon_name.substring(6)}</span>) : 
+      LucideIcons[selectedType.icon_name] || Mail
+    ) : Mail;
+  
   const isLinkedIn = writingType === 'linkedin_message';
   const isFollowUp = writingType === 'follow_up';
   const hasConversationContext = isLinkedIn || isFollowUp;
@@ -445,6 +464,11 @@ export default function InternshipAppGenerator() {
         onClose={() => setIsPromptsModalOpen(false)}
         templates={promptTemplates}
         onSave={handlePromptSave}
+        onAdd={async (data) => {
+          await addPromptTemplate(data);
+          await loadDatabaseData();
+        }}
+        writingTypes={writingTypes}
       />
       
       <EditConfigModal 
@@ -455,6 +479,28 @@ export default function InternshipAppGenerator() {
         onSave={handleConfigSave}
         onAdd={handleConfigAdd}
         onDelete={handleConfigDelete}
+      />
+      
+      <EditWritingTypeModal 
+        isOpen={isWritingTypeModalOpen}
+        onClose={() => {
+          setIsWritingTypeModalOpen(false);
+          loadDatabaseData();
+        }}
+        data={writingTypes}
+        onSave={async (id, data) => {
+          await updateWritingType(id, data);
+          await loadDatabaseData();
+        }}
+        onAdd={async (data) => {
+          await addWritingType(data);
+          await loadDatabaseData();
+        }}
+        onDelete={async (id) => {
+          await deleteWritingType(id);
+          await loadDatabaseData();
+        }}
+        onOpenPromptEditor={() => setIsPromptsModalOpen(true)}
       />
       
       {/* History Sidebar */}
@@ -491,9 +537,9 @@ export default function InternshipAppGenerator() {
                   <Edit className="w-6 h-6 text-green-600 group-hover:scale-110 transition-transform" />
                 </button>
                 <button
-                  onClick={() => openConfigModal('writing_types')}
+                  onClick={() => setIsWritingTypeModalOpen(true)}
                   className="p-3 bg-white/70 backdrop-blur-sm hover:bg-white rounded-xl transition-all shadow-lg border border-white/20 group"
-                  title="Edit Configuration"
+                  title="Edit Writing Types"
                 >
                   <Settings className="w-6 h-6 text-orange-600 group-hover:scale-110 transition-transform" />
                 </button>
@@ -530,7 +576,7 @@ export default function InternshipAppGenerator() {
                   <h2 className="text-2xl font-semibold text-slate-800">Writing Type</h2>
                 </div>
                 <button
-                  onClick={() => openConfigModal('writing_types')}
+                  onClick={() => setIsWritingTypeModalOpen(true)}
                   className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                   title="Edit Writing Types"
                 >
@@ -540,7 +586,6 @@ export default function InternshipAppGenerator() {
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {writingTypes.map((type) => {
-                  const Icon = type.icon_name ? LucideIcons[type.icon_name] || Mail : Mail;
                   return (
                     <button
                       key={type.value}
@@ -552,7 +597,7 @@ export default function InternshipAppGenerator() {
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        <Icon className="w-5 h-5 text-indigo-600" />
+                        {renderTypeIcon(type.icon_name, "w-5 h-5 text-indigo-600")}
                         <div className="font-medium text-slate-800">{type.label}</div>
                       </div>
                       <div className="text-sm text-slate-600">{type.description}</div>

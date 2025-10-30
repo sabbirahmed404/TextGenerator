@@ -23,7 +23,7 @@ export default function InternshipAppGenerator() {
   const [customWordLimit, setCustomWordLimit] = useState('');
   const [isCustomWordLimit, setIsCustomWordLimit] = useState(false);
   const [conversationContext, setConversationContext] = useState([
-    { id: 1, direction: 'received', text: '', timestamp: '' }
+    { id: 1, direction: 'received', text: '', timestamp: '', datetime: '' }
   ]);
   const [generatedContent, setGeneratedContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -129,7 +129,7 @@ export default function InternshipAppGenerator() {
     
     setConversationContext([
       ...conversationContext,
-      { id: Date.now(), direction: newDirection, text: '', timestamp: '' }
+      { id: Date.now(), direction: newDirection, text: '', timestamp: '', datetime: '' }
     ]);
   };
 
@@ -332,7 +332,7 @@ export default function InternshipAppGenerator() {
     setSpecificDetails('');
     setLinkedinPersonInfo('');
     setWordLimit(150);
-    setConversationContext([{ id: 1, direction: 'received', text: '', timestamp: '' }]);
+    setConversationContext([{ id: 1, direction: 'received', text: '', timestamp: '', datetime: '' }]);
     setGeneratedContent('');
     setCurrentHistoryId(null);
   };
@@ -459,13 +459,13 @@ export default function InternshipAppGenerator() {
       {/* Header */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/5 to-blue-600/5"></div>
-        <div className="relative max-w-7xl mx-auto px-6 py-12">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
           <div className="text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-indigo-600 to-blue-600 rounded-2xl mb-6 shadow-lg">
               <Briefcase className="w-8 h-8 text-white" />
             </div>
-            <div className="flex items-center justify-center gap-4 mb-4">
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent text-center">
                 {profile?.name}'s Application Generator
               </h1>
               <div className="flex items-center gap-2">
@@ -499,7 +499,7 @@ export default function InternshipAppGenerator() {
                 </button>
               </div>
             </div>
-            <p className="text-xl text-slate-600 max-w-2xl mx-auto mb-4">
+            <p className="text-base sm:text-lg lg:text-xl text-slate-600 max-w-2xl mx-auto mb-4 px-4 text-center">
               Professional applications that respect word limits and conversation context
             </p>
           </div>
@@ -507,8 +507,8 @@ export default function InternshipAppGenerator() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 pb-12">
-        <div className="grid lg:grid-cols-2 gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
           
           {/* Input Section */}
           <div className="space-y-6">
@@ -531,7 +531,7 @@ export default function InternshipAppGenerator() {
                 </button>
               </div>
               
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {writingTypes.map((type) => {
                   const Icon = type.icon_name ? LucideIcons[type.icon_name] || Mail : Mail;
                   return (
@@ -573,7 +573,7 @@ export default function InternshipAppGenerator() {
                 </button>
               </div>
               
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {availableTones.map((toneOption) => (
                   <button
                     key={toneOption.value}
@@ -623,7 +623,7 @@ export default function InternshipAppGenerator() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
                           Position Level
@@ -747,13 +747,36 @@ export default function InternshipAppGenerator() {
                           />
                           
                           {/* Optional Timestamp */}
-                          <input
-                            type="text"
-                            value={msg.timestamp || ''}
-                            onChange={(e) => updateConversationMessage(msg.id, 'timestamp', e.target.value)}
-                            placeholder="Timestamp (optional, e.g., '2 days ago' or '10:30 AM')..."
-                            className="w-full p-2 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white/80 text-slate-600 placeholder-slate-400"
-                          />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={msg.timestamp || ''}
+                              onChange={(e) => updateConversationMessage(msg.id, 'timestamp', e.target.value)}
+                              placeholder="Timestamp (optional, e.g., '2 days ago')..."
+                              className="w-full p-2 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white/80 text-slate-600 placeholder-slate-400"
+                            />
+                            <input
+                              type="datetime-local"
+                              value={msg.datetime || ''}
+                              onChange={(e) => {
+                                updateConversationMessage(msg.id, 'datetime', e.target.value);
+                                // Also update timestamp with formatted date/time if user wants
+                                if (e.target.value) {
+                                  const date = new Date(e.target.value);
+                                  const formatted = date.toLocaleString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true
+                                  });
+                                  updateConversationMessage(msg.id, 'timestamp', formatted);
+                                }
+                              }}
+                              className="w-full p-2 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white/80 text-slate-600"
+                              title="Pick date & time"
+                            />
+                          </div>
                         </div>
                         {conversationContext.length > 1 && (
                           <button
@@ -795,7 +818,7 @@ export default function InternshipAppGenerator() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-2">
                         Position Level *

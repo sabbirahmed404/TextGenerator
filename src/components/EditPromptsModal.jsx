@@ -36,15 +36,15 @@ export default function EditPromptsModal({ isOpen, onClose, templates, onSave })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-200">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
               <FileText className="w-5 h-5 text-purple-600" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-800">Edit Prompt Templates</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Edit Prompt Templates</h2>
           </div>
           <button
             onClick={onClose}
@@ -55,9 +55,9 @@ export default function EditPromptsModal({ isOpen, onClose, templates, onSave })
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden flex">
+        <div className="flex-1 overflow-hidden flex flex-col sm:flex-row">
           {/* Sidebar - Template List */}
-          <div className="w-64 border-r border-slate-200 overflow-y-auto bg-slate-50 p-4">
+          <div className="w-full sm:w-64 border-b sm:border-b-0 sm:border-r border-slate-200 overflow-y-auto bg-slate-50 p-4 max-h-48 sm:max-h-none">
             <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wide">Templates</h3>
             <div className="space-y-2">
               {templates?.map((template) => (
@@ -127,7 +127,7 @@ export default function EditPromptsModal({ isOpen, onClose, templates, onSave })
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-200 bg-white">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 p-4 sm:p-6 border-t border-slate-200 bg-white">
           <button
             onClick={onClose}
             className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors font-medium text-slate-700"
@@ -137,7 +137,7 @@ export default function EditPromptsModal({ isOpen, onClose, templates, onSave })
           <button
             onClick={handleSave}
             disabled={isSaving || !templateContent.trim()}
-            className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center justify-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? (
               <>

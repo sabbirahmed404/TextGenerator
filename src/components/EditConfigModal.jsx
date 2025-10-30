@@ -108,11 +108,11 @@ export default function EditConfigModal({ isOpen, onClose, configType, data, onS
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200">
-          <h2 className="text-2xl font-bold text-slate-800">{getTitle()}</h2>
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-200">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800">{getTitle()}</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -122,7 +122,7 @@ export default function EditConfigModal({ isOpen, onClose, configType, data, onS
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {editingItem ? (
             // Edit Form
             <div className="space-y-4">
@@ -182,11 +182,11 @@ export default function EditConfigModal({ isOpen, onClose, configType, data, onS
                 </div>
               ))}
 
-              <div className="flex items-center gap-3 pt-4">
+              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 pt-4">
                 <button
                   onClick={handleSaveItem}
                   disabled={isSaving}
-                  className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-50"
                 >
                   {isSaving ? (
                     <>
@@ -267,7 +267,7 @@ export default function EditConfigModal({ isOpen, onClose, configType, data, onS
 
         {/* Footer */}
         {!editingItem && (
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-200 bg-slate-50">
+          <div className="flex items-center justify-end gap-3 p-4 sm:p-6 border-t border-slate-200 bg-slate-50">
             <button
               onClick={onClose}
               className="px-6 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium"
